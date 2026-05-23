@@ -1,0 +1,406 @@
+#!/bin/sh
+# declutter	a script to declutter user-generated data via:
+#			archive data
+#			clean mismatched
+#			deduplicate data
+#			erase empty dirs
+#
+# created	2026/05/04 by Dave Henderson (support@cliquesoft.org)
+# updated	2026/05/20 by Dave Henderson (support@cliquesoft.org)
+#
+# Unless a valid Cliquesoft Private License (CPLv1) has been purchased for your
+# device, this software is licensed under the Cliquesoft Public License (CPLv2)
+# as found on the Cliquesoft website at www.cliquesoft.org.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the appropriate Cliquesoft License for details.
+
+
+
+
+# SCRIPT VARIABLE DEFINITIONS
+
+# ACTIONS
+ARCHIVE=
+MATCH=
+DEDUP=
+EMPTY=
+
+# OPTIONS
+ACTION=
+DRYRUN=
+EXISTS=
+IGNORE=
+HIDDEN=
+PREFIX=
+SOURCE=
+TARGET=
+STORED=
+
+# OTHER
+DB="dedupe.db"
+DEBUG='TRUE'
+FOUND=
+FILE=
+HASH=
+SIZE=
+TEMP=
+
+DIR_TEMP='/tmp/declutter'
+
+
+
+
+# -------------------- DO **NOT** EDIT BELOW THIS LINE --------------------
+
+
+
+
+# -------------------------------------------------------------------------
+
+
+
+
+# DEFINE BUILT-IN FUNCTIONS FOR EXPORT
+
+
+
+
+# DEFINE BUILT-IN FUNCTIONS FOR INTERNAL USE
+
+# Usage syntax: Traverse
+# Overview:	traverses a directory structure to perform the desired action
+# Parameters:
+Traverse() {
+	for ITEM in $(ls -1${HIDDEN} "$1"); do
+		LOCATION="$(echo "$1" | sed "s|^${TARGET}||;s|^/||")"				# remove the SOURCE prefix from the path, then any preceeding '/' (since we're not dealing with a root-level directory)
+
+		if [ "$LOCATION" ]; then							# WARNING: this has to be two separate tests since it's an || condition!
+			( echo "$LOCATION" | grep -q '/'$ ) || LOCATION="${LOCATION}/"		# this adds a slash if there is a location (so we're not trying to delete from root)
+		fi
+
+		# if it's a directory, then enter it!		NOTE: we need to traverse into directories REGARDLESS of their date stamps since files within can have newer/older dates
+		if [ -d "${1}/${ITEM}" ]; then
+# LEFT OFF - test if a symlink pointing to a directory goes in here
+			echo "[  >>  ] ${1}/${ITEM}"
+			Traverse "${1}/${ITEM}"
+			continue
+		# skip symbolic links if we're dedup'ing
+		elif [ "$DEDUP" ] && [ -h "${1}/${ITEM}" ]; then
+			echo "[ link ] ${1}/${ITEM}"
+			continue
+		fi
+
+
+		# first lets check if the file needs to be ignored via its date
+		if [ "$IGNORE" ]; then
+# LEFT OFF - make sure the below date comparison works with busybox
+			# https://stackoverflow.com/questions/14802807/compare-files-date-bash
+			[ "$IGNORE" = 'after' ] && [ "${1}/${ITEM}" -nt "${DIR_TEMP}/date" ] && {
+				echo "[ignore]   ${ITEM}"
+				continue
+			}
+			[ "$IGNORE" = 'before' ] && [ "${1}/${ITEM}" -ot "${DIR_TEMP}/date" ] && {
+				echo "[ignore]   ${ITEM}"
+				continue
+			}
+		fi
+
+		# if we're cleaning mismatched data -AND- the file exists in SOURCE and TARGET, then no further processing is necessary...
+		if [ "$MATCH" ] && [ -e "${1}/${ITEM}" ]; then
+			echo "[exists]   ${ITEM}"
+			continue
+		elif [ "$DEDUP" ]; then
+			SIZE=$(stat -c %s "${1}/${ITEM}" 2>/dev/null)				# store the file size (in bytes) in a variable
+echo "size |$SIZE|"
+			FOUND=$(grep ^"${SIZE}|" "${DIR_TEMP}/${DB}")				# store all the files that have matching file sizes
+#			grep -qm 1 ^"${SIZE}|" "${DIR_TEMP}/${DB}" || {				# if the files' size is NOT found in the unique-file database, then...
+			[ ! "$FOUND" ] && {							# if the files' size is NOT found in the unique-file database, then...
+				echo "[unique]   ${ITEM}"					#   inform the user
+				echo "${SIZE}||${1}/${ITEM}" >>"${DIR_TEMP}/${DB}"		#   store the size in the database
+				continue							#   continue to the next ITEM
+			}
+echo "FOUND:"
+echo "$FOUND"
+			# if we've made it down here then the files' size WAS found in the database, so...
+			HASH=$(md5sum "${1}/${ITEM}" | sed 's/ .*//')				# generate a hash for the newly found file matching an existing size
+echo "hash |$HASH|"
+			for FILE in $(echo "$FOUND"); do					# cycle each file matching the size that currently exists in the database	NOTE: https://stackoverflow.com/questions/16535886/maintain-line-breaks-in-output-from-subshell
+echo -n "iterating match |$FILE|"
+				if ( echo "$FILE" | grep -q '||' ); then			#   if that file hasn't already had a hash generated for it, then... (this should only take place when an initial size match occurs)
+					TEMP=$(md5sum "${FILE##*|}" | sed 's/ .*//')		#      store the hash of the iterated matching file in the database
+					sed -i "s!$FILE!${FILE%%|*}|${TEMP}|${FILE##*|}!" "${DIR_TEMP}/${DB}"
+				else								#   otherwise there is a hash already generated, so...
+					TEMP=$(echo "$FILE" | grep -oe '|.*|' | sed 's/|//g')	#      store it
+				fi
+echo "$TEMP|"
+				if [ "$HASH" = "$TEMP" ]; then					#   if the hash matches an entry in the database, then...
+#					echo "[ copy ]   ${ITEM}"				#      inform the user that this is a duplicate
+					TEMP='duplicate'					#      store that we found a duplicate
+					break							#      now exit the 'for' loop and execute the file processing below
+				fi
+			done
+			[ "$TEMP" != 'duplicate' ] && {						#   if the file is unique, then...
+				echo "[unique]   ${ITEM}"					#      inform the user
+				echo "${SIZE}|${HASH}|${1}/${ITEM}" >>"${DIR_TEMP}/${DB}"	#      store the current ITEM in the database
+				continue							#      continue to the next ITEM
+			}
+
+# generate an md5 for the iterated file
+# check if an md5 is generated for the matching file in the database
+#	if not, then generate one and update the line in the database
+#	if so, compare the two md5's
+#		if different, store the iterated files info in the database
+#		if the same, then execute the code below
+
+# test deduplication with a single directory and against two directories
+# when using 2, we need to build the database with the SOURCE, then process the TARGET against that list
+		fi
+
+
+		# if the file needs to be processed (e.g. it does NOT exist in both locations), then...
+		if [ "$ACTION" = 'move' ]; then
+			echo "[ move ]   ${ITEM}"
+			# NOTE: the PREFIX value contains the -P syntax
+
+			# https://docstore.mik.ua/orelly/unix3/upt/ch10_13.htm
+			# https://stackoverflow.com/questions/10781609/deleting-files-after-adding-to-tar-archive
+			( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           tar cf - -C \"${TARGET}\" --remove-files \"${LOCATION}${ITEM}\" | tar xf - -C \"${STORED}\" --transform=\"${PREFIX}\""
+			[ ! "$DRYRUN" ] && tar cf - -C "${TARGET}" --remove-files "${LOCATION}${ITEM}" | tar xf - -C "${STORED}" --transform="${PREFIX}"
+		elif [ "$ACTION" = 'delete' ]; then
+			echo "[delete]   ${ITEM}"
+			( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           rm -Rf \"${TARGET}/${LOCATION}${ITEM}\""
+			[ ! "$DRYRUN" ] && rm -Rf "${TARGET}/${LOCATION}${ITEM}" 2>&1
+		fi
+		continue
+	done
+}
+
+
+
+
+
+
+
+
+
+
+# SCRIPT PARAMETER PROCESSING
+
+if [ ! "$1" ] || [ "$1" = '--help' ]; then			# displays ACTION and OPTION help for this script
+	echo
+	echo " This script provides actions to automate manipulation of user-generated data."
+	echo
+	echo "  Usage: ${0##*/} [OPTIONS] ACTION SOURCE [TARGET] [STORED]"
+	echo
+	echo "  Actions:"
+	echo '	-a   archives data'
+	echo '	        - the TARGET value is not used'
+	echo '	-c   cleans mismatched data'
+	echo '	        - the SOURCE needs to contain the desired data (clean)'
+	echo '	        - the TARGET needs to contain the additional data (dirty)'
+	echo '	-d   deduplicates data'
+#	echo '	        - the TARGET value is used for comparison of data'
+	echo '	        - the TARGET value can be used for comparison between dirs,'
+	echo '	          otherwise the SOURCE will be deduplicated'
+	echo '	-e   cleans empty directories'
+	echo '	        - the TARGET value is not used'
+	echo
+	echo '	--help      shows this screen'
+	echo '	--version   displays the software version'
+	echo
+	echo '  Options:'
+	echo '	-A   ignore data after this date: YYYY-MM-DD HH:MM:SS'
+	echo '	-B   ignore data before this date: YYYY-MM-DD HH:MM:SS'
+	echo '	-D   use and existing deduplication database: NAME'
+	echo '	-H   include hidden files and folders'
+	echo '	-N   perform a trial run with no changes made (dryrun)'
+	echo '	-P   directory prefix to remove when moving data: PREFIX'
+	echo
+	echo
+	echo '  Notes:'
+	echo '	- All ACTIONS need one of these valid values: move, delete'
+	echo "	- The STORED value must be specified when 'move' is used"
+	echo
+
+	exit
+elif [ "$1" = '--version' ] || [ "$3" = '--version' ]; then	# so a user can do 'pax -O xml --version'
+	head -10 "$0" | grep ^'# updated' | sed "s/.*\\t//;s/ .*//;s:/:.:g"
+	exit 0
+else
+	TEMP=0
+	while getopts a:A:B:c:d:D:e:HNP: OPTION; do		# NOTE: the 'V:' indicates that the '-V' parameter requires a value!
+		( echo $OPTION | grep -qe '[a-z]' ) && TEMP=1					# if we've reached an ACTION, then...
+		if [ $TEMP -gt 0 ] && ( echo $OPTION | grep -qe '[A-Z]' ); then			# if an ACTION was already processed -AND- we've reached an OPTION, then...
+			echo "ERROR: All OPTIONS must preceed the ACTION."
+			exit 1
+		fi
+
+		case ${OPTION} in
+			a|c|d|e) if ( ! echo "${OPTARG}" | grep -qE ^'(delete|move)'$ ); then
+					echo "You must provide a valid value to the -${OPTION} action."
+					exit 1
+				fi
+				ACTION="$OPTARG"
+				[ "$OPTION" = 'a' ] && ARCHIVE='TRUE'
+				[ "$OPTION" = 'c' ] && MATCH='TRUE'
+				[ "$OPTION" = 'd' ] && DEDUP='TRUE'
+				[ "$OPTION" = 'e' ] && EMPTY='TRUE'
+				;;
+			A|B)	if ( echo "${OPTARG}" | grep -qe ^'\-.' ); then
+					echo "ERROR: You must provide a proper value to the -${OPTION} option."
+					exit 1
+				fi
+				[ -e "${DIR_TEMP}/date" ] && rm "${DIR_TEMP}/date"		# delete any prior instances
+				touch -d "$OPTARG" "${DIR_TEMP}/date"
+				[ "$OPTION" = 'A' ] && IGNORE='after'
+				[ "$OPTION" = 'B' ] && IGNORE='before'
+				;;
+			D)	if ( echo "${OPTARG}" | grep -qe ^'\-.' ); then
+					echo "ERROR: You must provide a proper value to the -D option."
+					exit 1
+				fi
+				EXISTS='TRUE'
+				DB="$OPTARG"
+				;;
+			H)	HIDDEN='A' ;;			# sets the 'ls' option
+			N)	DRYRUN='TRUE' ;;
+			P)	if ( echo "${OPTARG}" | grep -qe ^'\-.' ); then
+					echo "ERROR: You must provide a proper value to the -P option."
+					exit 1
+				fi
+				# https://serverfault.com/questions/330127/tar-remove-leading-directory-components-on-extraction
+				( ! echo "$OPTARG" | grep -q '/'$ ) && OPTARG="${OPTARG}/"	# if there's no trailing backslash, add it!
+				PREFIX="s|^${OPTARG}||" ;;	# setup the tar --transform syntax
+		esac
+	done
+fi
+
+
+
+
+# now that the ACTIONS and OPTIONS have been processed, lets process the SOURCE, TARGET, STORED
+shift $(expr $OPTIND - 1)
+SOURCE="$1"
+
+#( [ "$MATCH" ] || [ "$DEDUP" ] ) && TARGET="$2" || TARGET="$1"	# NOTE: we make TARGET equal to SOURCE to make Traverse() work correctly if we're not MATCH'ing or DEDUP'ing
+#( [ "$MATCH" ] || [ "$DEDUP" ] ) && STORED="$3" || STORED="$2"
+[ "$ARCHIVE" ] && TARGET="$1"
+[ "$MATCH" ] && TARGET="$2"
+[ "$DEDUP" ] && [ "$3" ] && TARGET="$2"				# if -d was passed with STORED, then...
+[ "$DEDUP" ] && [ ! "$3" ] && TARGET="$1"			# if -d was passed without STORED, then...
+[ "$EMPTY" ] && TARGET="$1"
+
+[ "$ARCHIVE" ] && STORED="$2"
+[ "$MATCH" ] && STORED="$3"
+[ "$DEDUP" ] && [ "$3" ] && STORED="$3"				# if -d was passed with STORED, then...
+[ "$DEDUP" ] && [ ! "$3" ] && STORED="$2"			# if -d was passed without STORED, then...
+[ "$EMPTY" ] && STORED="$2"
+
+
+
+
+# priledge checks
+[ ! "$EUID" ] && EUID=$(id -u)					# if EUID is not already set, then obtain its value
+if [ $EUID -gt 0 ]; then
+	echo "ERROR: This script requires elevated priledges, try with sudo or root."
+	exit 1
+fi
+
+
+# action checks							  NOTE: we can't write to a log yet since those checks haven't occurred
+TEMP=0
+[ "$ARCHIVE" ] && TEMP=$(( TEMP + 1 ))
+[ "$MATCH" ] && TEMP=$(( TEMP + 1 ))
+[ "$DEDUP" ] && TEMP=$(( TEMP + 1 ))
+[ "$EMPTY" ] && TEMP=$(( TEMP + 1 ))
+[ $TEMP -gt 1 ] && { echo "ERROR: Include only one ACTION when executing this script."; exit 1; }
+[ $TEMP -eq 0 ] && { echo "ERROR: You must provide an ACTION when executing this script."; exit 1; }
+
+
+# option checks
+if [ ! "$SOURCE" ]; then
+	echo "ERROR: You must include the SOURCE value when using this script."
+	exit 1
+fi
+if [ "$ARCHIVE" ] && [ ! "$IGNORE" ]; then
+	echo "ERROR: You must include a '-A' or '-B' option when using '-a'."
+	exit 1
+fi
+if [ "$MATCH" ] && [ ! "$TARGET" ]; then
+	echo "ERROR: You must include the TARGET value when using '-c'."
+	exit 1
+fi
+if [ "$ACTION" = 'move' ] && [ ! "$STORED" ]; then
+	echo "ERROR: You must include the STORED value when using 'move'."
+	exit 1
+fi
+
+
+# directory checks						  NOTE: we can't write to a log yet since those checks are occurring
+if [ ! -d "${DIR_TEMP}" ]; then
+	mkdir -p "${DIR_TEMP}" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (DIR_TEMP) does not exist and could not be created."; exit 1; }
+fi
+touch "${DIR_TEMP}/writable" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (DIR_TEMP) is not writable."; exit 1; }
+rm "${DIR_TEMP}/writable" >/dev/null 2>&1
+
+if [ "$STORED" ]; then
+	if [ ! -d "${STORED}" ]; then
+		mkdir -p "${STORED}" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (STORED) does not exist and could not be created."; exit 1; }
+	fi
+	touch "${STORED}/writable" >/dev/null 2>&1 || { echo "ERROR: The temporary directory (STORED) is not writable."; exit 1; }
+	rm "${STORED}/writable" >/dev/null 2>&1
+fi
+
+
+# file checks
+if [ "${DEDUP}" ]; then
+	[ -e "${DIR_TEMP}/${DB}" ] && rm "${DIR_TEMP}/${DB}"	# if a database already exists, delete it now
+	touch "${DIR_TEMP}/${DB}"
+fi
+
+
+
+
+# strip any trailing '/' from the SOURCE and TARGET
+SOURCE="$(echo "$SOURCE" | sed 's|/$||')"
+TARGET="$(echo "$TARGET" | sed 's|/$||')"
+
+
+# if we're in debug mode, let's display some information...
+if [ "$DEBUG" ]; then
+	echo
+	echo "Debug variable values"
+	echo '---------------------'
+	echo "ACTION |$ACTION|"
+	echo "IGNORE |$IGNORE|"
+	echo "SOURCE |$SOURCE|"
+	echo "TARGET |$TARGET|"
+	echo "STORED |$STORED|"
+	echo "PREFIX |$PREFIX|"
+	echo
+fi
+
+
+# set the IFS so the 'for' loops work on CR's instead of spaces
+IFS='
+'								# NOTE: we have to use this method since dash doesn't work with IFS=$'\n'
+
+
+# start processing the request
+Traverse "$TARGET"						# NOTE: when the action is not MATCH, TARGET equals SOURCE
+
+
+# provide notifications
+[ "$DEDUP" ] && [ -e "${DIR_TEMP}/${DB}" ] && {
+	echo
+	echo "NOTE:"
+	echo "If you want to retain the database to compare against later, then it needs"
+	echo "to be moved, copied, or renamed. It is automatically deleted otherwise."
+}
+
+
+# cleanup
+[ -e "${DIR_TEMP}/date" ] && rm "${DIR_TEMP}/date"
+
