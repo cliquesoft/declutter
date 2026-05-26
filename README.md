@@ -41,32 +41,26 @@
 
 # [EXAMPLE ACTIONS]
 
-	Install a package:
-	     pax -i nano[.i32.bin.soft]
+	Archive data before May 1st 2025 to /mnt/archive:
+	     declutter -A '2025-05-01 00:00:01' -a move /mnt/nas /mnt/archive
 
-	Install packages from a file:
-	     pax -i /path/to/package.list
+	Separate live data after May 1st 2025 to /mnt/live:
+	     declutter -B '2025-05-01 00:00:01' -a move /mnt/nas /mnt/live
 
-	Install a specific version:
-	     pax -i -V 1.2.3 nano[.i32.bin.soft]
+	Deduplicate a single directory, ignorning newer additions
+	     declutter -A '2025-05-01 00:00:01' -d delete /home/user/Videos
 
-	Make a package for distribution:
-	     pax -m nano /path/to/package[/source]
+	Deduplicate two directories moving the duplicates to /opt/dupes
+	     declutter -d move /mnt/sda1/files /mnt/sdb1/data /opt/dupes
 
-	Only download a package from the repo:
-	     pax -d nano[.i32.bin.soft]
+	Remove empty directories:
+	     declutter -e delete /mnt/nas/data
 
-	Update a package without optional restore point:
-	     pax -i -R none nano[.i32.bin.soft]
+	Delete mismatch data (including hidden) between two drives:
+	     declutter -H -m delete /mnt/sdb1 /mnt/sdc1
 
-	Unload a package:
-	     pax -u unload nano[.i32.bin.soft]
-
-	Uninstall a package:
-	     pax -u delete nano[.i32.bin.soft]
-
-	Uninstall a package, purging configs too:
-	     pax -u purge nano[.i32.bin.soft]
+	Move mismatched (non-hidden) data between two drives to /opt/diff:
+	     declutter -m copy /mnt/sdb1 /mnt/sdc1 /opt/diff
 
 
 

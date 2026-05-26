@@ -1,3 +1,12 @@
 2026/05/22
 - initial release
 
+2026/05/26
+- Added the 'package' script
+- Added the .deps and .info files
+- Moved the -c action to -m for consistency
+- Removed documentation comments
+- Updated comment placements in the script
+- Updated the README file
+- Updated the documentation
+

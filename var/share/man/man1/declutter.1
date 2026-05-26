@@ -13,14 +13,14 @@
 ACTIONS:
   -a   archives data
           - the TARGET value is not used
-  -c   cleans mismatched data
-          - the SOURCE needs to contain the desired data (clean)
-          - the TARGET needs to contain the additional data (dirty)
   -d   deduplicates data
           - the TARGET value can be used for comparison between dirs,
             otherwise the SOURCE will be deduplicated
   -e   cleans empty directories
           - the TARGET value is not used
+  -m   cleans mismatched data
+          - the SOURCE needs to contain the desired data (clean)
+          - the TARGET needs to contain the additional data (dirty)
 
   --help      shows this screen
   --version   displays the software version
@@ -60,331 +60,62 @@ manage user-generated data - moving or deleting it. Contact our staff to
 request additional features to be added in future releases.
 
 Currently this project can perform a variety of operations including:
-  o Copying packages (and dependencies) from one location to another
-  o Extracting packages (and dependencies) to a specified location
-  o Downloading packages (and dependencies) to a specified location
-  o Finding local packages that one or more files belong to
-  o (Un)installing packages (and dependencies)
-  o (Un)installing different versions of packages
-  o List installed packages
-  o Make and package software for distribution
-  o Open a fifo for network client operation
-  o Display dependency trees for packages
-  o Validate and repair installed software
-  o Output can be displayed in various formats
-  o Proxy several actions from an offline to an online device
+  o Archive data using before or after dates
+  o Clean mismatched data between directories or drives
+  o Deduplicate data between one or two directories
+  o Remove empty directories
+  o Each action can ignore files by date specifications
+  o Hidden directories and files can optionally be included
+  o Dryruns can test results before implementation
+  o Each action can move or delete data matching criteria
+  o Directory paths can be manipulated when moving data
 
 Common outstanding features include:
-  o Ability to search online repos
-  o Automated package checking/downloading/updating
   o A graphical user interface
-
-Unique outstanding features include:
-  o Ability to process .deb (and other) package types
-  o Expand output to include an 'html' and 'json' option
-  o More proxy actions
-  o A centralized update server
-  o A network server to manipulate packages on clients
+  o Ability to color output
+  o Ability to output to different formats
 
 
 
 
 .SH CONFIG
 
-There are a variety of values that can be modified so that pax can work
-with any Linux distro. This ranges from package storage locations and
-operational directories, to package extensions and schemas. Each value
-will be covered below, but first lets discuss config file placements.
-There are three locations that pax searches for its configuration. The
-first is the system-wide settings found in /etc/pax/config. The second
-and third locations are for personal configurations and are found in
-~/.etc/pax/config (XSB) and ~/.pax/config (LSB). The search order is
-completed by the passed values during execution, each instance taking
-precedence over its predecessor.
-
-To summarize:
-  o The search order: /etc/pax, ~/.[etc/]pax, passed values
-
-We will now cover each variable available for adjustment in the config
-file.
-
-
-.I Local Repo Values
-
-.B REPO_PREFIX
-This directory contains the file lists (LIST_BOOT and LIST_LIVE) as well
-as the directories containing your downloaded software packages. So just
-as the name suggests, its the prefix to your local repo.
-
-.B REPO_OPTION
-A sub-directory of REPO_PREFIX, this directory stores all the optional
-software that is added to a basic operating system.
-
-.B REPO_SYSTEM
-Like the previous variable, this one also stores additional software.
-However, this directory would contain packages to expand a default OS.
-For example, XiniX VE stores all the X11 packages in here to load during
-the device bootup. This can also contain packages like NTFS so that
-filesystems of that type are available for usage. Basically any software
-that the base operating system would need, should be added here. Also of
-note, this is the default directory processed when the -B switch is
-passed.
-
-.B REPO_RESTOR
-Specific to pax, this package manager creates restore points when a user
-uninstalls software by issuing a '-u delete', '-u purge', or '-u update'
-switch.
-
-
-.I Directory Values
-
-.B DIR_INIT
-This directory contains the daemon service scripts.
-
-.B DIR_INST
-This directory contains the package installation scripts.
-
-.B DIR_LIST
-This directory contains the additional package files for installed
-software.
-
-.B DIR_LIVE
-Once a device has booted, this is the default directory where packages
-get installed. On most distro's this will simply be root (/). However,
-XiniX defaults to the /Users/Public directory (which is similar to the
-/usr tree in LSB). An interesting feature of this variable allows its
-value to end with a dot (.) that will replace the initial slash of
-the packaged files. So, for example, if a package contains a file in
-the /etc directory, it would then become /Users/Public/.etc in the
-XiniX OS (or any other using that notation).
-
-.B DIR_LOGS
-This directory contains the softwares logs.
-
-.B DIR_LOOP
-This directory contains the mount points for symlinked packages.
-
-.B DIR_TEMP
-This directory contains temp files used by the software.
-
-.I Package Extensions
-
-.B EXT_CORE
-[text file] Used to mark a package as part of the base OS
-
-.B EXT_CODE
-[tgz file] The file extension used for a packages' source code
-
-.B EXT_DEPS
-[text file] The file extension used for the package dependency list
-
-.B EXT_HASH
-[text file] The file extension used for the package validation hash
-
-.B EXT_INFO
-[text file] The file extension used for the package details info
-
-.B EXT_LIST
-[text file] The file extension used for the package manifest info
-
-.B EXT_MAKE
-[text file] The file extension used for the package make commands
-
-.B EXT_SOFT
-[mksquashfs file] The file extension of the actual packaged software
-
-
-.I Log Files
-
-.B LOG_DBUG
-The log file for debug output
-
-.B LOG_ERRS
-The log file for (error) output
-
-.I Ownership and Permissions
-
-.B OWN_GROUP
-The default group that all users are members of
-
-.B OWN_SYSTEM
-The full ownership (user and group) of REPO_SYSTEM directory
-
-.B PRM_SYSTEM
-The permissions that the REPO_SYSTEM directory must have (for security)
-
-.I Value Definitions
-
-.B FIFO_SERVER
-The default name for the -o action fifo
-
-.B ARCH_VALUES
-The valid values for the -C option
-
-
-.I Schema Values
-
-Since schema's are used as templates, these values can incorporate the
-use of several variables. When using these variables, be sure to use
-them in the fashion they are shown below. With the exception of the
-ARCH_SCHEMA and KRNL_SCHEMA values, all the others should be enclosed
-with single quotes (') as they are interprited at specific times instead
-of once during the initial execution of the script. The variables are:
-  ${PACKAGE} - the package name
-  ${ARCH}    - the devices' CPU architecture
-  ${TYPE}    - package type
-  ${VERSION} - any included package version
-
-.B ARCH_SCHEMA
-The command executed to determine which CPU architecture the device falls
-under, and relates to one of the values in ARCH_VALUES. This should be
-encapsulated with double quotes (").
-
-.B FILE_SCHEMA
-This is the schema for the local package filenames and should be enclosed
-in single quotes ('). This value should NOT include a file extension!
-
-.B KRNL_SCHEMA
-The currently used kernel string that gets appended to Linux kernel driver
-packages. Typically this is just "$(uname -r)".
-
-.B REPO_SCHEMA
-This is the URL for the distro's online repo, and should be within single
-quotes ('). This value should include the 'http' prefix!
-
-.B VERS_SCHEMA
-This variable indicates the package naming convention within the online
-source repo, using the schema variables to provide the most flexibility
-for the distro. For example, if the distro wants to place all associated
-files in a single package directory, they can utilize multiple variables
-to do so. Contrarily, if the distro wants to separate the various packages
-by different URL's, then they can do so as well by using the REPO_SCHEMA
-variable. Of course, both values can be simultaneously used for even
-greater flexibility. This value should be enclosed with single quotes (')
-and WITHOUT a file extension!
-
-.B VERT_SCHEMA
-Working alongside VERS_SCHEMA, this variable indicates the target filename
-that should be used locally. The '${VERSION}' schema variable usually is
-part of this value, but is not mandatory. This value should NOT include a
-file extension!
-
-
-.I Lists and Flags
-
-There are two package lists and four flag files that define which packages
-are loaded at the different stages of device operation. The lists should
-be considered which packages are desired, whereas the flag files designate
-which packages are forbidden - even if they are dependencies of packages
-in the list files! Each of these variables should have their values
-encapsulated in single quotes (') as they are interprited ondemand.
-
-These variables also have access to a shell function called 'getBootcode'
-that allows the value to change depending on the passage of a value from
-the boot loader such as grub or syslinux. This way a user can define an
-alternative value to use, or the distro default otherwise. An example of
-a value could be:
-  '$( V=$(getBootcode code); [ "$V" ] && echo $V || echo default )'
-
-.B LIST_BOOT
-This list defines which packages are loaded during the device bootup. A
-unique feature of pax is that the package loading can be split into two
-phases to speed up this process. Packages contained within this list
-get loaded in the foreground, causing the bootup to wait until all have
-been loaded before continuing. For this reason, kernel drivers and other
-necessary packages should be placed here. User applications like an email
-and an office suite should be placed in LIST_LIVE.
-
-To enable this dual-phase process, this file must exist, even if it is
-blank. Its absense will indicate that all packages need to be processed
-in the traditional way, with a longer bootup.
-
-.B LIST_LIVE
-A value for this list is mandatory. Unlike LIST_BOOT, this file must
-exist as it is used to load packages whether the dual-stage booting is
-enabled or not. In fact, to manually switch to a single-stage bootup,
-simply move the packages from LIST_BOOT into this list and erase the
-other file. And unless an alternate list is specified with the -L
-switch, this one is used to know which packages need to be loaded by
-default versus which ones should be reserved for ondemand loading.
-
-.B FLAG_BOOT
-The complement flag file to LIST_BOOT that contains packages that should
-not be loaded during bootup. The list can even contain dependency files.
-In essence, this is a blacklist to LIST_BOOT.
-
-.B FLAG_LIVE
-The complement flag file to LIST_LIVE that contains packages that should
-skipped during the processing of automatically loaded software. This is a
-blacklist to LIST_LIVE.
-
-.B FLAG_COPY
-Unlike the prior two flag files, the mere presence of this file is the
-only requirement to indicate that ALL packages need to be copied instead
-of symlinked. This can be overwritten by passing the '-M link' switch when
-calling pax though.
-
-.B FLAG_FIRM
-Also indicating that packages need to be copied instead of symlinked, but
-this flag only pertains to the base OS packages found in REPO_SYSTEM and
-LIST_BOOT.
-
-
-.I Miscellaneous Definitions
-
-.B FOLLOWUP
-This variable includes any unique command for the distro that needs to be
-called after all packages are loaded. If the value contains the variable
-${PACKAGE}, then it will be called once for every package passed into pax.
-In its absence, the command will be called once.
-
-.B DEBUG
-To see everything that takes place while pax is being executed, set this
-value to 1. A pax.debug log will be produced containing a plethora of
-information. Setting this value to 2 will additional prompt before any
-actual system changes take place.
-
-.B COLORS
-If you like colored output, then set this to 'TRUE' and avoid having to
-pass the -Z switch every time.
+Currently there are no config files associated with this utility.
 
 
 
 
 .SH PARAMETERS
 
-To maintain consistency, there are several parameters to note. The first
-that we'll cover is PACKAGE(S). Normally this value will consist of a
-space separated list of package names. However, a text file containing
-one package per line can also be used as an alternative. This can come
-in handy if automating any process by moving a variable list of packages
-into a text file while calling a uniformed pax command.
+This utility can take several parameters to affect its operation. We will
+cover the last three here, with the first and second contained in their
+own section below.
 
-The final value that can be used is a directory itself, and will process
-all contained packages. The downside to this is that the DIRECTORY value
-can no longer be used. An alternative to this method while retaining the
-ability to use the DIRECTORY value, is to use -S for the source location.
+Each action requires a SOURCE, and optionally TARGET, directories. These
+will be the locations that get processed by the desired action. It is
+important to note that only the -m action requires both of these values,
+while being optional for -d, and unused by all others. However, each
+action, if passed 'move', must include the STORED directory to know where
+the targeted data should be moved. By default the path will be preserved,
+but that can be adjusted via the -P option (see below).
 
-To summarize, the PACKAGE(S) value can be:
-  o A space separated list of package names
-  o A file containing a list (one package per line)
-  o Or directory containing the package(s)
+Unless there is 100% certainty that the contents of a SOURCE directory
+are unique, it is suggested to deduplicate that directory first before
+using it as the comparison with a TARGET directory. Likewise, if there
+are suspected duplicates in the TARGET directory that only reside in
+that location and not also in SOURCE, you would need to deduplicate that
+directory by itself beforehand. In other words, deduplicating does not
+deduplicate the SOURCE, then the TARGET, and then the two against one
+another. Each directory will need to have deduplication run on it
+singularly before compared against one another if there is any doubt. One
+last note, when using both SOURCE and TARGET, only the files in TARGET
+will be moved or deleted.
 
-The last parameter pax can accept is DIRECTORY. Typically it operates as
-the target location for the passed action (with the exception outlined
-above), and is optional. To provide flexibility for the user, there are
-several different syntaxes that are permitted. Both full and relative
-paths are permissible, but the value must contain a forward slash (/) to
-indicate it's a directory instead of a package name. This will not be a
-problem with full paths as they obviously start with one. Relative paths
-can either begin with a './', end with a '/', or contain a slash within
-the value (e.g. 'some/dir').
-
-To summarize, the DIRECTORY value can be:
-  o A full path: /tmp/pax/
-  o Or a relative path: ./pax
-    Containing a slash: dir/pax
-    With a trailing slash: pax/
+To summarize:
+  o The -m action requires both SOURCE and TARGET
+  o The -d action can optionally accept TARGET
+  o No other action uses TARGET
+  o Each action requires STORED if moving targeted data
 
 
 
@@ -394,48 +125,45 @@ To summarize, the DIRECTORY value can be:
 As with virtually all software, switches can be passed to modify its
 operation. The below section covers each switch in detail, separating
 the actions from the options. It is important to note that the options
-actually need to proceed the actions when calling pax.
+actually need to proceed the actions when executing this software.
+
+While not an action, by simply placing a blank file in the temp directory
+with the name 'PID.stop' where 'PID' is the numeric value of the running
+process, this software will stop operation immediately.
 
 .B --help
-Shows helpful information about the program
-
-.B --install
-Installs pax as the default package manager in non-XiniX Linux distros. In
-this process, there is an option to configure dual or single-stage device
-bootup that can speed up the time it takes to get into the OS. See the
-'Lists and Flags' section above for more information.
-
-.B --uninstall
-Uninstalls pax as the default package manager in non-XiniX Linux distros.
+Shows helpful information about the program.
 
 .B --version
 Displays the software version and exits.
 
-.B -c
-Users can simply use a graphical file manager, or the 'cp' command at a
-shell prompt to copy files. However, this would require manually tracing
-dependency trees to copy all the necessary packages required to make a
-program work correctly. This action reduces all that work into a single,
-convenient command. If no PACKAGE(S) value is passed, then all packages
-in the DIR_OPTION (or -S location) will be processed.
+.B -a
+Over time user-generated data obvioulsy builds. Not only can this make the
+working environment cluttered, but also force the need for larger storage
+capacity in the live and backup drives. Archiving data is an easy way to
+alieviate each of these issues with a single task. For large data sets, a
+weekly, monthly, or semi-annual scheduled task can make sure that your live
+environment stays as trim as possible!
+
+This action only utilizes the SOURCE and optional STORED directory values.
 
 .B -d
-There may be times when a package just needs to be downloaded so it can
-be processed in the future. This could include network update servers,
-software testing, or even pre-installed ondemand software for (device)
-deployment scenarios. Using this action allows the packages to be
-obtained before they are required.
+There are various scenarios where data can (accidentally) get duplicated.
+As stated above, this can cause problems as storage capacity gets needlessly
+consumed. Deduplicating files is a great way to recover drive space, some
+times in significant quantities.
+
+This action only can accept SOURCE, TARGET, and STORED directory values.
 
 .B -e
-Similar to the -d ACTION, this switch will extract the contents of one or
-more packages to a specified location. This can be useful in situations
-where packages need to be (forensically) compared, imaging devices, or any
-other situation requiring the extraction of package files. Without passing
-a PACKAGE(S) value, all packages in the DIR_OPTION (or -S location) will
-be processed.
+Running any other action may lead to empty directories being left behind
+once data has been moved. It is recommended to re-run this utility
+aftewards to remove these as a follow-up. This step is not performed
+automatically in order to preserve directory structures.
 
-It is important to note that this action will always overwrite data due to
-the underlying binary being used.
+
+LEFT OFF
+
 
 .B -f FILES
 While not a routine task, there may be times when it is useful to find the

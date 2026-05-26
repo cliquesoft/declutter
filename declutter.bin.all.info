@@ -1,0 +1,48 @@
+name:		declutter
+title:		Data Management Utility
+description:	A lightweight data management utility
+version:	2026.05.26.1
+released:	2026.05.26
+packaged:	2026.05.26
+authors:	Cliquesoft
+homepage:	https://www.cliquesoft.org
+download:	_REPO/official/1.0/declutter/stable.tgz
+git:		https://github.com/cliquesoft/declutter
+commit:		commit/002b43725c2879675caccf749520cf5e5bbe91c3
+file:		archive/refs/tags/2026.05.26.1.tar.gz
+clone:		.git
+repo:		https://www.cliquesoft.org/official/vanilla/1.0/declutter
+package:	stable.soft
+source:		stable.code
+builder:	stable.bldr
+compile:	stable.make
+size:		32K
+category:	utilities
+interface:	cli
+toolkit:	shell
+rating:		g
+license:	CPLv2
+document:	https://www.cliquesoft.org/#Licenses
+maintainer:	wysiwyg
+tags:		declutter user data management empty hidden directories drives archive archiving mismatch mismatched deduplicate deduplicating deduplication dryrun
+overview:	A lightweight script to perform a variety of tasks allowing an
+		admin to manage user-generated data - moving or deleting it.
+		Functionality includes: archiving data using before or after
+		dates, cleaning mismatched data between directories or drives,
+		deduplicating data between one or two directories, and removal
+		of empty directories. Additional features include: each action
+		being able to ignore data by data specifications, optional
+		inclusion of hidden files and directories, ability to test a
+		run first by operating in a 'dryrun' mode, move or delete the
+		targeted data, and manipulation of directory paths when moving
+		targeted data.
+comments:	  [PLANNED UPDATES]
+		There are several planned updates that will eventually be
+		added. Patches or donations are welcome and will expedite
+		future updates. Features include:
+		- A graphical interface
+		- Ability to color output
+		- Ability to output to different formats
+		Feature requests can be sent to: service@cliquesoft.org
+changes:	
+
