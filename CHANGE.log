@@ -8,5 +8,11 @@
 - Removed documentation comments
 - Updated comment placements in the script
 - Updated the README file
-- Updated the documentation
+- Started creating the man page
+
+2026/05/27
+- Added a -D check to make sure it is only passed with -d
+- Added a -P check to make sure it is only passed with 'move'
+- Updated -N to -Y for consistency with pax
+- Continued creating the man page
 

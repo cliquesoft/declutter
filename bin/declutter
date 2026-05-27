@@ -251,8 +251,8 @@ if [ ! "$1" ] || [ "$1" = '--help' ]; then			# displays ACTION and OPTION help f
 	echo '	-B   ignore data before this date: YYYY-MM-DD HH:MM:SS'
 	echo '	-D   use and existing deduplication database: NAME'
 	echo '	-H   include hidden files and folders'
-	echo '	-N   perform a trial run with no changes made (dryrun)'
 	echo '	-P   directory prefix to remove when moving data: PREFIX'
+	echo '	-Y   perform a trial run with no changes made (dryrun)'
 	echo
 	echo
 	echo '  Notes:'
@@ -268,7 +268,7 @@ elif [ "$1" = '--version' ] || [ "$3" = '--version' ]; then	# so a user can do '
 	exit 0
 else
 	TEMP=0
-	while getopts a:A:B:d:D:e:Hm:NP: OPTION; do		# NOTE: the 'V:' indicates that the '-V' parameter requires a value!
+	while getopts a:A:B:d:D:e:Hm:P:Y OPTION; do		# NOTE: the 'V:' indicates that the '-V' parameter requires a value!
 		( echo $OPTION | grep -qe '[a-z]' ) && TEMP=1					# if we've reached an ACTION, then...
 		if [ $TEMP -gt 0 ] && ( echo $OPTION | grep -qe '[A-Z]' ); then			# if an ACTION was already processed -AND- we've reached an OPTION, then...
 			echo "ERROR: All OPTIONS must preceed the ACTION."
@@ -303,13 +303,13 @@ else
 				DB="$OPTARG"
 				;;
 			H)	HIDDEN='A' ;;			# sets the 'ls' option
-			N)	DRYRUN='TRUE' ;;
 			P)	if ( echo "${OPTARG}" | grep -qe ^'\-.' ); then
 					echo "ERROR: You must provide a proper value to the -P option."
 					exit 1
 				fi
 				PREFIX="${OPTARG}"
 				;;
+			Y)	DRYRUN='TRUE' ;;
 		esac
 	done
 fi
@@ -363,8 +363,16 @@ if [ "$ARCHIVE" ] && [ ! "$IGNORE" ]; then
 	echo "ERROR: You must include a '-A' or '-B' option when using '-a'."
 	exit 1
 fi
+if [ ! "$DEDUP" ] && [ "$EXISTS" ]; then
+	echo "ERROR: The '-D' option can only be used with the '-d' action."
+	exit 1
+fi
 if [ "$MATCH" ] && [ ! "$TARGET" ]; then
 	echo "ERROR: You must include the TARGET value when using '-c'."
+	exit 1
+fi
+if [ "$ACTION" = 'delete' ] && [ "$PREFIX" ]; then
+	echo "ERROR: The -P option can only be used when moving targeted data."
 	exit 1
 fi
 if [ "$ACTION" = 'move' ] && [ ! "$STORED" ]; then
