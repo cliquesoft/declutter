@@ -16,3 +16,8 @@
 - Updated -N to -Y for consistency with pax
 - Continued creating the man page
 
+2026/05/28
+- Added a STORED directory check when 'delete' is passed
+- Added the -R option
+- Updated the tar code to preserve ownership and permissions in the full path
+

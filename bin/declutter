@@ -6,7 +6,7 @@
 #			erase empty dirs
 #
 # created	2026/05/04 by Dave Henderson (support@cliquesoft.org)
-# updated	2026/05/23 by Dave Henderson (support@cliquesoft.org)
+# updated	2026/05/28 by Dave Henderson (support@cliquesoft.org)
 #
 # Unless a valid Cliquesoft Private License (CPLv1) has been purchased for your
 # device, this software is licensed under the Cliquesoft Public License (CPLv2)
@@ -34,6 +34,9 @@ EXISTS=
 IGNORE=
 HIDDEN=
 PREFIX=
+ADDDEL=
+
+# PARAMETERS
 SOURCE=
 TARGET=
 STORED=
@@ -81,6 +84,12 @@ Traverse() {
 	for ITEM in $(ls -1p${HIDDEN} "$1" | grep -v '/'$; ls -1p${HIDDEN} "$1" | grep '/'$ | sed 's|/$||'); do
 		[ -e "${DIR_TEMP}/$$.stop" ] && exit 0		# if the user initiated a stop request then exit each initiation of this function
 
+		# remove the passed TARGET value from the path, then any preceeding '/' (since we're not dealing with a root-level directory)
+		LOCATION="$(echo "$1" | sed "s|^${TARGET}||;s|^/||")"
+		if [ "$LOCATION" ]; then							# WARNING: this has to be two separate tests since it's an || condition!
+			( echo "$LOCATION" | grep -q '/'$ ) || LOCATION="${LOCATION}/"		# this adds a slash if there is a location (so we're not trying to delete from root)
+		fi
+
 
 		# skip symbolic links if we're dedup'ing
 		if [ "$DEDUP" ] && [ -h "${1}/${ITEM}" ]; then
@@ -98,8 +107,9 @@ Traverse() {
 				# grep turns the command into true/false
 				if ( ! find "${1}/${ITEM}" -mindepth 1 -maxdepth 1 -print -quit | grep -q . ); then				# if the iterated directory is empty, then...
 					[ ! -e "${STORED}/${1}/${ITEM}" ] && [ "$ACTION" = 'move' ] && {
-						( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           tar cf - --remove-files \"${1}/${ITEM}\" | tar xf - -C \"${STORED}\" --transform=\"${PREFIX}\""
-						[ ! "$DRYRUN" ] && tar cf - --remove-files "${1}/${ITEM}" 2>>"$LOG" | tar xf - -C "${STORED}" --transform="${PREFIX}" 2>>"$LOG"
+						( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           tar cf - -C \"${TARGET}\" \"${LOCATION}${ITEM}\" | tar xf - -C \"${STORED}\" --transform=\"${PREFIX}\""
+						# NOTE: the 'awk' command steps through each directory in the path to store its ownership/permissions
+						[ ! "$DRYRUN" ] && tar cf - --no-recursion -C "${TARGET}" $(echo ${LOCATION}${ITEM} | awk -F/ '{ d=$1; for (i=2; i <= NF; i++) { print d; d=d "/" $i }; print d }') 2>>"$LOG" | tar xf - -C "${STORED}" --transform="${PREFIX}" 2>>"$LOG"
 					}
 					continue
 				fi
@@ -184,12 +194,6 @@ Traverse() {
 		# IF WE'VE MADE IT HERE, THEN WE EITHER NEED TO MOVE/DELETE DATA -OR- WE'RE CLEANING MISMATCHED DATA
 
 
-		# remove the passed TARGET value from the path, then any preceeding '/' (since we're not dealing with a root-level directory)
-		LOCATION="$(echo "$1" | sed "s|^${TARGET}||;s|^/||")"
-		if [ "$LOCATION" ]; then							# WARNING: this has to be two separate tests since it's an || condition!
-			( echo "$LOCATION" | grep -q '/'$ ) || LOCATION="${LOCATION}/"		# this adds a slash if there is a location (so we're not trying to delete from root)
-		fi
-
 		# if we're cleaning mismatched data -AND- the file exists in SOURCE and TARGET, then no further processing is necessary...
 		if [ "$MATCH" ] && [ -e "${SOURCE}/${LOCATION}${ITEM}" ]; then
 			echo "[exists]   ${ITEM}"
@@ -203,8 +207,13 @@ Traverse() {
 
 			# https://docstore.mik.ua/orelly/unix3/upt/ch10_13.htm
 			# https://stackoverflow.com/questions/10781609/deleting-files-after-adding-to-tar-archive
-			( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           tar cf - -C \"${TARGET}\" --remove-files \"${LOCATION}${ITEM}\" | tar xf - -C \"${STORED}\" --transform=\"${PREFIX}\""
-			[ ! "$DRYRUN" ] && tar cf - -C "${TARGET}" --remove-files "${LOCATION}${ITEM}" 2>>"$LOG" | tar xf - -C "${STORED}" --transform="${PREFIX}" 2>>"$LOG"
+			# https://serverfault.com/questions/877254/tar-does-not-retain-directory-permissions
+			( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           tar cf - -C \"${TARGET}\" \"${LOCATION}${ITEM}\" | tar xf - -C \"${STORED}\" --transform=\"${PREFIX}\""
+			if [ ! "$DRYRUN" ]; then
+				# NOTE: the 'awk' command steps through each directory in the path to store its ownership/permissions
+				tar cf - --no-recursion -C "${TARGET}" $(echo ${LOCATION}${ITEM} | awk -F/ '{ d=$1; for (i=2; i <= NF; i++) { print d; d=d "/" $i }; print d }') 2>>"$LOG" | tar xf - -C "${STORED}" --transform="${PREFIX}" 2>>"$LOG"
+				[ -e "${STORED}/${LOCATION}${ITEM}" ] && rm "${TARGET}/${LOCATION}${ITEM}"					# now remove the file that has been moved
+			fi
 		elif [ "$ACTION" = 'delete' ]; then
 			echo "[delete]   ${ITEM}"
 			( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           rm -Rf \"${TARGET}/${LOCATION}${ITEM}\""
@@ -251,7 +260,8 @@ if [ ! "$1" ] || [ "$1" = '--help' ]; then			# displays ACTION and OPTION help f
 	echo '	-B   ignore data before this date: YYYY-MM-DD HH:MM:SS'
 	echo '	-D   use and existing deduplication database: NAME'
 	echo '	-H   include hidden files and folders'
-	echo '	-P   directory prefix to remove when moving data: PREFIX'
+	echo '	-P   directory prefix to add when moving data: PREFIX'
+	echo '	-R   directory prefix to remove when moving data: PREFIX'
 	echo '	-Y   perform a trial run with no changes made (dryrun)'
 	echo
 	echo
@@ -268,7 +278,7 @@ elif [ "$1" = '--version' ] || [ "$3" = '--version' ]; then	# so a user can do '
 	exit 0
 else
 	TEMP=0
-	while getopts a:A:B:d:D:e:Hm:P:Y OPTION; do		# NOTE: the 'V:' indicates that the '-V' parameter requires a value!
+	while getopts a:A:B:d:D:e:Hm:P:R:Y OPTION; do		# NOTE: the 'V:' indicates that the '-V' parameter requires a value!
 		( echo $OPTION | grep -qe '[a-z]' ) && TEMP=1					# if we've reached an ACTION, then...
 		if [ $TEMP -gt 0 ] && ( echo $OPTION | grep -qe '[A-Z]' ); then			# if an ACTION was already processed -AND- we've reached an OPTION, then...
 			echo "ERROR: All OPTIONS must preceed the ACTION."
@@ -296,18 +306,20 @@ else
 				[ "$OPTION" = 'B' ] && IGNORE='before'
 				;;
 			D)	if ( echo "${OPTARG}" | grep -qe ^'\-.' ); then
-					echo "ERROR: You must provide a proper value to the -D option."
+					echo "ERROR: You must provide a proper value to the -${OPTION} option."
 					exit 1
 				fi
 				EXISTS='COMPARE'
 				DB="$OPTARG"
 				;;
 			H)	HIDDEN='A' ;;			# sets the 'ls' option
-			P)	if ( echo "${OPTARG}" | grep -qe ^'\-.' ); then
-					echo "ERROR: You must provide a proper value to the -P option."
+			P|R)	if ( echo "${OPTARG}" | grep -qe ^'\-.' ); then
+					echo "ERROR: You must provide a proper value to the -${OPTION} option."
 					exit 1
 				fi
 				PREFIX="${OPTARG}"
+				[ "$OPTION" = 'P' ] && ADDDEL='add'
+				[ "$OPTION" = 'R' ] && ADDDEL='del'
 				;;
 			Y)	DRYRUN='TRUE' ;;
 		esac
@@ -375,6 +387,10 @@ if [ "$ACTION" = 'delete' ] && [ "$PREFIX" ]; then
 	echo "ERROR: The -P option can only be used when moving targeted data."
 	exit 1
 fi
+if [ "$ACTION" = 'delete' ] && [ "$STORED" ]; then
+	echo "ERROR: The STORED directory is not used when deleting targeted data."
+	exit 1
+fi
 if [ "$ACTION" = 'move' ] && [ ! "$STORED" ]; then
 	echo "ERROR: You must include the STORED value when using 'move'."
 	exit 1
@@ -414,7 +430,9 @@ if [ "$PREFIX" ]; then
 	( ! echo "$PREFIX" | grep -q '/'$ ) && PREFIX="${PREFIX}/"				# if there's no trailing backslash, add it! https://serverfault.com/questions/330127/tar-remove-leading-directory-components-on-extraction
 	( ! echo "$PREFIX" | grep -q ^'./' ) && ( echo "$SOURCE" | grep -q ^'./' ) && PREFIX="./${PREFIX}"					# these two lines make the SOURCE and PREFIX syntax the same so the --transform tar switch works correctly
 	( echo "$PREFIX" | grep -q ^'./' ) && ( ! echo "$SOURCE" | grep -q ^'./' ) && PREFIX="${PREFIX#*/}"
-	PREFIX="s|^${PREFIX}||"									# setup the tar --transform syntax
+
+	[ "$ADDDEL" = 'add' ] && PREFIX="s|^|${PREFIX}|"					# setup the tar --transform syntax
+	[ "$ADDDEL" = 'del' ] && PREFIX="s|^${PREFIX}||"
 fi
 
 

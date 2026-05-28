@@ -1,22 +1,22 @@
 name:		declutter
 title:		Data Management Utility
 description:	A lightweight data management utility
-version:	2026.05.26.1
-released:	2026.05.26
-packaged:	2026.05.26
+version:	2026.05.27.1
+released:	2026.05.27
+packaged:	2026.05.27
 authors:	Cliquesoft
 homepage:	https://www.cliquesoft.org
 download:	_REPO/official/1.0/declutter/stable.tgz
 git:		https://github.com/cliquesoft/declutter
 commit:		commit/002b43725c2879675caccf749520cf5e5bbe91c3
-file:		archive/refs/tags/2026.05.26.1.tar.gz
+file:		archive/refs/tags/2026.05.27.1.tar.gz
 clone:		.git
 repo:		https://www.cliquesoft.org/official/vanilla/1.0/declutter
 package:	stable.soft
 source:		stable.code
 builder:	stable.bldr
 compile:	stable.make
-size:		32K
+size:		20K
 category:	utilities
 interface:	cli
 toolkit:	shell
