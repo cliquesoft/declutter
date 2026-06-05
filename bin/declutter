@@ -6,7 +6,7 @@
 #			erase empty dirs
 #
 # created	2026/05/04 by Dave Henderson (support@cliquesoft.org)
-# updated	2026/05/28 by Dave Henderson (support@cliquesoft.org)
+# updated	2026/06/05 by Dave Henderson (support@cliquesoft.org)
 #
 # Unless a valid Cliquesoft Private License (CPLv1) has been purchased for your
 # device, this software is licensed under the Cliquesoft Public License (CPLv2)
@@ -22,19 +22,18 @@
 # SCRIPT VARIABLE DEFINITIONS
 
 # ACTIONS
+ACTION=
 ARCHIVE=
 DEDUP=
 EMPTY=
 MATCH=
 
 # OPTIONS
-ACTION=
 DRYRUN=
 EXISTS=
 IGNORE=
 HIDDEN=
 PREFIX=
-ADDDEL=
 
 # PARAMETERS
 SOURCE=
@@ -44,9 +43,11 @@ STORED=
 # OTHER
 DIR_TEMP='/tmp/declutter'
 
+AD=
 DB="${DIR_TEMP}/dedupe.db"
 LOG="/var/log/declutter.log"
-DEBUG='TRUE'
+DEBUG=
+EPOCH=
 FOUND=
 FILE=
 HASH=
@@ -78,7 +79,8 @@ TEMP=
 # Parameters:
 # DIRECTORY	[string] the directory to traverse
 Traverse() {
-	local DIR						# NOTE: we have to use a local variable to preserve the ITEM value when using EMPTY
+	local S							# NOTE: we have to use a local variable to preserve the ITEM value when using EMPTY
+	local T
 
 	# NOTE: we first list all the files in the directory, then the directories (removing the trailing /) so that the output will show files associated in the proper directory
 	for ITEM in $(ls -1p${HIDDEN} "$1" | grep -v '/'$; ls -1p${HIDDEN} "$1" | grep '/'$ | sed 's|/$||'); do
@@ -106,14 +108,14 @@ Traverse() {
 				# so if there is any contents only the first one will be printed, otherwise there is no output from 'find'
 				# grep turns the command into true/false
 				if ( ! find "${1}/${ITEM}" -mindepth 1 -maxdepth 1 -print -quit | grep -q . ); then				# if the iterated directory is empty, then...
-					[ ! -e "${STORED}/${1}/${ITEM}" ] && [ "$ACTION" = 'move' ] && {
+					[ "$ACTION" = 'move' ] && [ ! -e "${STORED}/${1}/${ITEM}" ] && {
 						( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           tar cf - -C \"${TARGET}\" \"${LOCATION}${ITEM}\" | tar xf - -C \"${STORED}\" --transform=\"${PREFIX}\""
 						# NOTE: the 'awk' command steps through each directory in the path to store its ownership/permissions
 						[ ! "$DRYRUN" ] && tar cf - --no-recursion -C "${TARGET}" $(echo ${LOCATION}${ITEM} | awk -F/ '{ d=$1; for (i=2; i <= NF; i++) { print d; d=d "/" $i }; print d }') 2>>"$LOG" | tar xf - -C "${STORED}" --transform="${PREFIX}" 2>>"$LOG"
 					}
-					continue
 				fi
-				DIR=$ITEM
+				S="${1}/${ITEM}"
+				T="${LOCATION}${ITEM}"
 			fi
 
 			Traverse "${1}/${ITEM}"
@@ -121,13 +123,13 @@ Traverse() {
 			# This follow-up code deletes all parts of the path that are now also empty by moving/deleting subdirs.
 			if [ "$EMPTY" ]; then
 				# if the use user passed PREFIX, then we need to adjust the path
-				[ "$PREFIX" ] && TEMP="$(echo "${1}/${DIR}" | sed "$PREFIX")" || TEMP="${1}/${DIR}"
-				[ -e "${STORED}/${TEMP}" ] && {					# if the (adjusted) path exists in STORED, then we can delete the *original* location
-					if ( ! find "${1}/${DIR}" -mindepth 1 -maxdepth 1 -print -quit | grep -q . ); then			# if the iterated directory is empty, then...
-						( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           rmdir \"${1}/${DIR}\""
-						[ ! "$DRYRUN" ] && rmdir "${1}/${DIR}" 2>>"$LOG"
-					fi
-				}
+				[ "$PREFIX" ] && TEMP="$(echo "${T}" | sed "$PREFIX")" || TEMP="${T}"
+				[ "$ACTION" = 'move' ] && [ ! -e "${STORED}${TEMP}" ] && continue					# if the (adjusted) path exists in STORED, then we can delete the *original* location
+
+				if ( ! find "${S}" -mindepth 1 -maxdepth 1 -print -quit | grep -q . ); then			# if the iterated directory is empty, then...
+					( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           rmdir \"${S}\""
+					[ ! "$DRYRUN" ] && rmdir "${S}" 2>>"$LOG"
+				fi
 			fi
 			continue
 		fi
@@ -301,9 +303,9 @@ else
 					exit 1
 				fi
 				[ -e "${DIR_TEMP}/date" ] && rm "${DIR_TEMP}/date"		# delete any prior instances
-				touch -d "$OPTARG" "${DIR_TEMP}/date"
 				[ "$OPTION" = 'A' ] && IGNORE='after'
 				[ "$OPTION" = 'B' ] && IGNORE='before'
+				EPOCH="$OPTARG"
 				;;
 			D)	if ( echo "${OPTARG}" | grep -qe ^'\-.' ); then
 					echo "ERROR: You must provide a proper value to the -${OPTION} option."
@@ -318,8 +320,8 @@ else
 					exit 1
 				fi
 				PREFIX="${OPTARG}"
-				[ "$OPTION" = 'P' ] && ADDDEL='add'
-				[ "$OPTION" = 'R' ] && ADDDEL='del'
+				[ "$OPTION" = 'P' ] && AD='add'
+				[ "$OPTION" = 'R' ] && AD='del'
 				;;
 			Y)	DRYRUN='TRUE' ;;
 		esac
@@ -418,6 +420,7 @@ if [ "${DEDUP}" ] && [ ! "$EXISTS" ]; then
 	[ -e "$DB" ] && rm "$DB"				# if a database already exists, delete it now
 	touch "$DB"
 fi
+[ "$IGNORE" ] && touch -d "$EPOCH" "${DIR_TEMP}/date"		# if we need to create a date comparison file, then do so now!
 
 
 
@@ -431,8 +434,8 @@ if [ "$PREFIX" ]; then
 	( ! echo "$PREFIX" | grep -q ^'./' ) && ( echo "$SOURCE" | grep -q ^'./' ) && PREFIX="./${PREFIX}"					# these two lines make the SOURCE and PREFIX syntax the same so the --transform tar switch works correctly
 	( echo "$PREFIX" | grep -q ^'./' ) && ( ! echo "$SOURCE" | grep -q ^'./' ) && PREFIX="${PREFIX#*/}"
 
-	[ "$ADDDEL" = 'add' ] && PREFIX="s|^|${PREFIX}|"					# setup the tar --transform syntax
-	[ "$ADDDEL" = 'del' ] && PREFIX="s|^${PREFIX}||"
+	[ "$AD" = 'add' ] && PREFIX="s|^|${PREFIX}|"						# setup the tar --transform syntax
+	[ "$AD" = 'del' ] && PREFIX="s|^${PREFIX}||"
 fi
 
 

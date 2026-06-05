@@ -21,3 +21,13 @@
 - Added the -R option
 - Updated the tar code to preserve ownership and permissions in the full path
 
+2026/06/04
+- Added EPOCH to store the -A and -B value
+- Moved the 'touch -r' command after DIR_TEMP has been checked/created
+- Updated ADDDEL to AD
+
+2026/06/05
+- Replaced DIR with S and T in Traverse()
+- Restructed the trailing EMPTY block in Traverse()
+- Removed a 'continue' call that prevented deletion of some empty directories
+
