@@ -6,7 +6,7 @@
 #			erase empty dirs
 #
 # created	2026/05/04 by Dave Henderson (support@cliquesoft.org)
-# updated	2026/06/05 by Dave Henderson (support@cliquesoft.org)
+# updated	2026/06/12 by Dave Henderson (support@cliquesoft.org)
 #
 # Unless a valid Cliquesoft Private License (CPLv1) has been purchased for your
 # device, this software is licensed under the Cliquesoft Public License (CPLv2)
@@ -95,7 +95,7 @@ Traverse() {
 
 		# skip symbolic links if we're dedup'ing
 		if [ "$DEDUP" ] && [ -h "${1}/${ITEM}" ]; then
-			echo "[ link ] ${1}/${ITEM}"
+			[ "$EXISTS" != 'BUILD' ] && echo "[ link ] ${1}/${ITEM}"		# only print this if we're actually processing directory contents, not when we're building the database
 			continue
 		# if it's a directory, then enter it!		  NOTE: we need to traverse into directories REGARDLESS of their date stamps since files within can have newer/older dates
 		elif [ -d "${1}/${ITEM}" ]; then
@@ -144,11 +144,11 @@ Traverse() {
 		if [ "$IGNORE" ]; then
 			# https://stackoverflow.com/questions/14802807/compare-files-date-bash
 			[ "$IGNORE" = 'after' ] && [ "${1}/${ITEM}" -nt "${DIR_TEMP}/date" ] && {
-				echo "[ignore]   ${ITEM}"
+				[ "$EXISTS" != 'BUILD' ] && echo "[ignore]   ${ITEM}"
 				continue
 			}
 			[ "$IGNORE" = 'before' ] && [ "${1}/${ITEM}" -ot "${DIR_TEMP}/date" ] && {
-				echo "[ignore]   ${ITEM}"
+				[ "$EXISTS" != 'BUILD' ] && echo "[ignore]   ${ITEM}"
 				continue
 			}
 		fi

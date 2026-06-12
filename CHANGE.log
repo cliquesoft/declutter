@@ -31,3 +31,6 @@
 - Restructed the trailing EMPTY block in Traverse()
 - Removed a 'continue' call that prevented deletion of some empty directories
 
+2026/06/12
+- Updated the output in Traverse() when building a deduplication database
+
