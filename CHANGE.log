@@ -34,3 +34,9 @@
 2026/06/12
 - Updated the output in Traverse() when building a deduplication database
 
+2026/06/23
+- Added the -A and -B checks for the -e action
+- Created a test script for the -a action
+- Created a test script for the -e action
+- Updated a bug in the path with the -e action
+

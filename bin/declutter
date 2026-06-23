@@ -99,6 +99,15 @@ Traverse() {
 			continue
 		# if it's a directory, then enter it!		  NOTE: we need to traverse into directories REGARDLESS of their date stamps since files within can have newer/older dates
 		elif [ -d "${1}/${ITEM}" ]; then
+			[ "$IGNORE" = 'after' ] && [ "${1}/${ITEM}" -nt "${DIR_TEMP}/date" ] && {
+				[ "$EXISTS" != 'BUILD' ] && echo "[ignore] ${1}/${ITEM}"
+				continue
+			}
+			[ "$IGNORE" = 'before' ] && [ "${1}/${ITEM}" -ot "${DIR_TEMP}/date" ] && {
+				[ "$EXISTS" != 'BUILD' ] && echo "[ignore]   ${1}/${ITEM}"
+				continue
+			}
+
 			[ "$EXISTS" != 'BUILD' ] && echo "[  >>  ] ${1}/${ITEM}"
 
 			if [ "$EMPTY" ]; then			# if we're searching for empty directories, then...
@@ -124,9 +133,10 @@ Traverse() {
 			if [ "$EMPTY" ]; then
 				# if the use user passed PREFIX, then we need to adjust the path
 				[ "$PREFIX" ] && TEMP="$(echo "${T}" | sed "$PREFIX")" || TEMP="${T}"
-				[ "$ACTION" = 'move' ] && [ ! -e "${STORED}${TEMP}" ] && continue					# if the (adjusted) path exists in STORED, then we can delete the *original* location
+				[ "$ACTION" = 'move' ] && [ ! -e "${STORED}/${TEMP}" ] && continue						# if the (adjusted) path exists in STORED, then we can delete the *original* location
 
-				if ( ! find "${S}" -mindepth 1 -maxdepth 1 -print -quit | grep -q . ); then			# if the iterated directory is empty, then...
+				if ( ! find "${S}" -mindepth 1 -maxdepth 1 -print -quit | grep -q . ); then					# if the iterated directory is empty, then...
+					# NOTE: the output won't necessarily be the same if run with -Y since parent directories wouldn't be empty as they would it would be when a live run is executed
 					( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           rmdir \"${S}\""
 					[ ! "$DRYRUN" ] && rmdir "${S}" 2>>"$LOG"
 				fi
