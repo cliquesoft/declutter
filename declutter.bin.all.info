@@ -43,6 +43,8 @@ comments:	  [PLANNED UPDATES]
 		- A graphical interface
 		- Ability to color output
 		- Ability to output to different formats
+		- Ability to delete invalid symlink files
+		- Ability to use a RegEx with directory name manipulation
 		Feature requests can be sent to: service@cliquesoft.org
 changes:	
 

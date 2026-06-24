@@ -6,7 +6,7 @@
 #			erase empty dirs
 #
 # created	2026/05/04 by Dave Henderson (support@cliquesoft.org)
-# updated	2026/06/12 by Dave Henderson (support@cliquesoft.org)
+# updated	2026/06/24 by Dave Henderson (support@cliquesoft.org)
 #
 # Unless a valid Cliquesoft Private License (CPLv1) has been purchased for your
 # device, this software is licensed under the Cliquesoft Public License (CPLv2)
@@ -99,14 +99,16 @@ Traverse() {
 			continue
 		# if it's a directory, then enter it!		  NOTE: we need to traverse into directories REGARDLESS of their date stamps since files within can have newer/older dates
 		elif [ -d "${1}/${ITEM}" ]; then
-			[ "$IGNORE" = 'after' ] && [ "${1}/${ITEM}" -nt "${DIR_TEMP}/date" ] && {
-				[ "$EXISTS" != 'BUILD' ] && echo "[ignore] ${1}/${ITEM}"
-				continue
-			}
-			[ "$IGNORE" = 'before' ] && [ "${1}/${ITEM}" -ot "${DIR_TEMP}/date" ] && {
-				[ "$EXISTS" != 'BUILD' ] && echo "[ignore]   ${1}/${ITEM}"
-				continue
-			}
+			if [ "$EMPTY" ]; then			# if we're searching for empty directories, then...
+				[ "$IGNORE" = 'after' ] && [ "${1}/${ITEM}" -nt "${DIR_TEMP}/date" ] && {
+					[ "$EXISTS" != 'BUILD' ] && echo "[ignore] ${1}/${ITEM}"
+					continue
+				}
+				[ "$IGNORE" = 'before' ] && [ "${1}/${ITEM}" -ot "${DIR_TEMP}/date" ] && {
+					[ "$EXISTS" != 'BUILD' ] && echo "[ignore]   ${1}/${ITEM}"
+					continue
+				}
+			fi
 
 			[ "$EXISTS" != 'BUILD' ] && echo "[  >>  ] ${1}/${ITEM}"
 
@@ -138,7 +140,10 @@ Traverse() {
 				if ( ! find "${S}" -mindepth 1 -maxdepth 1 -print -quit | grep -q . ); then					# if the iterated directory is empty, then...
 					# NOTE: the output won't necessarily be the same if run with -Y since parent directories wouldn't be empty as they would it would be when a live run is executed
 					( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           rmdir \"${S}\""
-					[ ! "$DRYRUN" ] && rmdir "${S}" 2>>"$LOG"
+					[ ! "$DRYRUN" ] && {
+						echo "[delete]   ${S}"
+						rmdir "${S}" 2>>"$LOG"
+					}
 				fi
 			fi
 			continue
@@ -260,6 +265,9 @@ if [ ! "$1" ] || [ "$1" = '--help' ]; then			# displays ACTION and OPTION help f
 	echo '	          otherwise the SOURCE will be deduplicated'
 	echo '	-e   cleans empty directories'
 	echo '	        - the TARGET value is not used'
+# VER2
+#	echo '	-l   cleans invalid hardlinks and symlinks'					e.g. if these aren't pointing to a valid source any longer, this action will remove them
+#	echo '	        - the TARGET value is not used'
 	echo '	-m   cleans mismatched data'
 	echo '	        - the SOURCE needs to contain the desired data (clean)'
 	echo '	        - the TARGET needs to contain the additional data (dirty)'
@@ -271,10 +279,18 @@ if [ ! "$1" ] || [ "$1" = '--help' ]; then			# displays ACTION and OPTION help f
 	echo '	-A   ignore data after this date: YYYY-MM-DD HH:MM:SS'
 	echo '	-B   ignore data before this date: YYYY-MM-DD HH:MM:SS'
 	echo '	-D   use and existing deduplication database: NAME'
+# VER2
+#	echo '	-E   directory manipulation when moving data: REGEX'				e.g. -E '|/def/|/789/|'
 	echo '	-H   include hidden files and folders'
+# VER2
+#	echo '	-O   display output format: fifo, text (default), xml, xmLive'
 	echo '	-P   directory prefix to add when moving data: PREFIX'
+# VER2
+#	echo '	-Q   quiets the output: all, errors, default, verbose, none'
 	echo '	-R   directory prefix to remove when moving data: PREFIX'
 	echo '	-Y   perform a trial run with no changes made (dryrun)'
+# VER2
+#	echo '	-Z   add color to the output'
 	echo
 	echo
 	echo '  Notes:'
@@ -347,14 +363,16 @@ SOURCE="$1"
 
 [ "$ARCHIVE" ] && TARGET="$1"
 [ "$MATCH" ] && TARGET="$2"
-[ "$DEDUP" ] && [ "$3" ] && TARGET="$2"				# if -d was passed with STORED, then...
-[ "$DEDUP" ] && [ ! "$3" ] && TARGET="$1"			# if -d was passed without STORED, then...
+[ "$DEDUP" ] && [ "$3" ] && TARGET="$2"								# if -d was passed with STORED, then...
+[ "$DEDUP" ] && [ "$2" ] && [ ! "$3" ] && [ "$ACTION" = 'move' ] && TARGET="$1"			# if -d was passed with STORED, then...
+[ "$DEDUP" ] && [ "$2" ] && [ ! "$3" ] && [ "$ACTION" = 'delete' ] && TARGET="$2"		# if -d was passed without STORED, then...
+[ "$DEDUP" ] && [ ! "$2" ] && TARGET="$1"							# if -d was passed without STORED, then...
 [ "$EMPTY" ] && TARGET="$1"
 
 [ "$ARCHIVE" ] && STORED="$2"
 [ "$MATCH" ] && STORED="$3"
-[ "$DEDUP" ] && [ "$3" ] && STORED="$3"				# if -d was passed with STORED, then...
-[ "$DEDUP" ] && [ ! "$3" ] && STORED="$2"			# if -d was passed without STORED, then...
+[ "$DEDUP" ] && [ "$3" ] && STORED="$3"								# if -d was passed with STORED, then...
+[ "$DEDUP" ] && [ "$2" ] && [ ! "$3" ] && [ "$ACTION" = 'move' ] && STORED="$2"			# if -d was passed with STORED, then...
 [ "$EMPTY" ] && STORED="$2"
 
 
@@ -391,8 +409,12 @@ if [ ! "$DEDUP" ] && [ "$EXISTS" ]; then
 	echo "ERROR: The '-D' option can only be used with the '-d' action."
 	exit 1
 fi
+if [ "$DEDUP" ] && [ "$EXISTS" ] && [ ! -e "$DB" ]; then
+	echo "ERROR: The referenced database does not exist."
+	exit 1
+fi
 if [ "$MATCH" ] && [ ! "$TARGET" ]; then
-	echo "ERROR: You must include the TARGET value when using '-c'."
+	echo "ERROR: You must include the TARGET value when using '-m'."
 	exit 1
 fi
 if [ "$ACTION" = 'delete' ] && [ "$PREFIX" ]; then

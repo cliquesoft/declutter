@@ -35,8 +35,19 @@
 - Updated the output in Traverse() when building a deduplication database
 
 2026/06/23
-- Added the -A and -B checks for the -e action
+- Added the -A and -B options for the -e action
 - Created a test script for the -a action
 - Created a test script for the -e action
-- Updated a bug in the path with the -e action
+- Updated the path assignment in Traverse() when using the -e action
+
+2026/06/24
+- Added additional output with the -e action
+- Added a check for the database existence with the -D option
+- Started creating a test script for the -d action
+- Created a test script for the -m action
+- Updated the test script for the -a action
+- Updated the test script for the -e action
+- Updated error verbiage
+- Updated directory date checking to only work with the -e action
+- Updated the directory assignments with the -d action
 

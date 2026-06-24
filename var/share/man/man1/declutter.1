@@ -166,7 +166,9 @@ Running any other action may lead to empty directories being left behind
 once data has been moved or deleted. The removal of these directories is
 not performed automatically in order to preserve existing path structures.
 In the event that their retension is undesired, calling this script while
-using this action will process all applicable directories.
+using this action will process all applicable directories. Additionally,
+the date comparison of directories is ignored on all other actions except
+this one since it only deals with those objects.
 
 This action only utilizes the SOURCE and optional STORED directory values.
 
