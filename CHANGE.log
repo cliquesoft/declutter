@@ -51,3 +51,15 @@
 - Updated directory date checking to only work with the -e action
 - Updated the directory assignments with the -d action
 
+2026/06/25
+- Started adding -P and -R tests to all test scripts
+- Added directory cleanup when -R is passed
+- Completed the test script for the -d action
+- Updated the link output
+- Updated deduplicating output
+- Updated the documentation to include additional examples
+
+2026/06/30
+- Completed adding -P and -R tests to all test scripts
+- Replaced the follow-up 'rm' call for a '--remove-files' tar option
+

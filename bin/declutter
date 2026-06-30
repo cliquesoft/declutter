@@ -6,7 +6,7 @@
 #			erase empty dirs
 #
 # created	2026/05/04 by Dave Henderson (support@cliquesoft.org)
-# updated	2026/06/24 by Dave Henderson (support@cliquesoft.org)
+# updated	2026/06/30 by Dave Henderson (support@cliquesoft.org)
 #
 # Unless a valid Cliquesoft Private License (CPLv1) has been purchased for your
 # device, this software is licensed under the Cliquesoft Public License (CPLv2)
@@ -95,7 +95,7 @@ Traverse() {
 
 		# skip symbolic links if we're dedup'ing
 		if [ "$DEDUP" ] && [ -h "${1}/${ITEM}" ]; then
-			[ "$EXISTS" != 'BUILD' ] && echo "[ link ] ${1}/${ITEM}"		# only print this if we're actually processing directory contents, not when we're building the database
+			[ "$EXISTS" != 'BUILD' ] && echo "[ link ]   ${ITEM}"			# only print this if we're actually processing directory contents, not when we're building the database
 			continue
 		# if it's a directory, then enter it!		  NOTE: we need to traverse into directories REGARDLESS of their date stamps since files within can have newer/older dates
 		elif [ -d "${1}/${ITEM}" ]; then
@@ -226,11 +226,8 @@ Traverse() {
 			# https://stackoverflow.com/questions/10781609/deleting-files-after-adding-to-tar-archive
 			# https://serverfault.com/questions/877254/tar-does-not-retain-directory-permissions
 			( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           tar cf - -C \"${TARGET}\" \"${LOCATION}${ITEM}\" | tar xf - -C \"${STORED}\" --transform=\"${PREFIX}\""
-			if [ ! "$DRYRUN" ]; then
-				# NOTE: the 'awk' command steps through each directory in the path to store its ownership/permissions
-				tar cf - --no-recursion -C "${TARGET}" $(echo ${LOCATION}${ITEM} | awk -F/ '{ d=$1; for (i=2; i <= NF; i++) { print d; d=d "/" $i }; print d }') 2>>"$LOG" | tar xf - -C "${STORED}" --transform="${PREFIX}" 2>>"$LOG"
-				[ -e "${STORED}/${LOCATION}${ITEM}" ] && rm "${TARGET}/${LOCATION}${ITEM}"					# now remove the file that has been moved
-			fi
+			# NOTE: the 'awk' command steps through each directory in the path to store its ownership/permissions
+			[ ! "$DRYRUN" ] && tar cf - --no-recursion --remove-files -C "${TARGET}" $(echo ${LOCATION}${ITEM} | awk -F/ '{ d=$1; for (i=2; i <= NF; i++) { print d; d=d "/" $i }; print d }') 2>>"$LOG" | tar xf - -C "${STORED}" --transform="${PREFIX}" 2>>"$LOG"
 		elif [ "$ACTION" = 'delete' ]; then
 			echo "[delete]   ${ITEM}"
 			( [ "$DRYRUN" ] || [ "$DEBUG" ] ) && echo "           rm -Rf \"${TARGET}/${LOCATION}${ITEM}\""
@@ -280,7 +277,7 @@ if [ ! "$1" ] || [ "$1" = '--help' ]; then			# displays ACTION and OPTION help f
 	echo '	-B   ignore data before this date: YYYY-MM-DD HH:MM:SS'
 	echo '	-D   use and existing deduplication database: NAME'
 # VER2
-#	echo '	-E   directory manipulation when moving data: REGEX'				e.g. -E '|/def/|/789/|'
+#	echo '	-E   directory manipulation when moving data: REGEX'				like -P and -R, but allows the user to specify their own regex to modify the directory structure (e.g. -E 's|/def/|/789/|')
 	echo '	-H   include hidden files and folders'
 # VER2
 #	echo '	-O   display output format: fifo, text (default), xml, xmLive'
@@ -495,7 +492,7 @@ IFS='
 
 # start processing the request
 if [ "$DEDUP" ] && [ "$SOURCE" != "$TARGET" ] && [ "$EXISTS" ]; then				# if we're deduplicating two different directories using an existing database, then...
-	echo -n "Using database: $DB"
+	echo "Using database: $DB"
 	echo 'Deduplicating the TARGET directory...'
 elif [ "$DEDUP" ] && [ "$SOURCE" != "$TARGET" ] && [ ! "$EXISTS" ]; then			# otherwise we need to build the SOURCE database first
 	echo -n "Building the database:"
@@ -506,6 +503,16 @@ elif [ "$DEDUP" ] && [ "$SOURCE" != "$TARGET" ] && [ ! "$EXISTS" ]; then			# oth
 	echo 'Deduplicating the TARGET directory...'
 fi
 Traverse "$TARGET"						# NOTE: when the action is not MATCH, TARGET equals SOURCE
+if ( [ "$DEDUP" ] || [ "$MATCH" ] ) && [ "$PREFIX" ] && [ "$AD" = 'del' ]; then			# if we're removing a portion of the directory prefix with a data move, then...
+	PREFIX="${PREFIX#*^}"									#   remove the regex syntax for tar to isolate just the original path value
+	PREFIX="${PREFIX%/||*}"
+
+	while [ "$PREFIX" ]; do									#   iterate through the portion to remove to delete each directory
+		rmdir "${STORED}/${PREFIX}"
+		( echo "$PREFIX" | grep -q '/' ) || PREFIX=
+		PREFIX="${PREFIX%/*}"
+	done
+fi
 
 
 # provide notifications
