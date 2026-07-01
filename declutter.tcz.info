@@ -1,10 +1,10 @@
 Title:          declutter.tcz
 Description:    A lightweight data management utility
-Version:        2026.06.05.1
+Version:        2026.06.30.1
 Author:         Cliquesoft
 Original-site:  https://www.cliquesoft.org
 Copying-policy: CPLv2
-Size:           32K
+Size:           20K
 Extension_by:   wysiwyg
 Tags:           declutter user data management empty hidden directories drives archive archiving mismatch mismatched deduplicate deduplicating deduplication dryrun
 Comments:       A lightweight script to perform a variety of tasks allowing an
@@ -44,6 +44,6 @@ Comments:       A lightweight script to perform a variety of tasks allowing an
                 Valid for all versions of TC
                 ----
                 PPI Compatible
-Change-log:     2026/05/26 First version
+Change-log:     2026/06/30 First version
                 See https://github.com/cliquesoft/declutter/blob/main/CHANGE.log
-Current:        2026/05/26 Current short change description
+Current:        2026/06/30 Current short change description

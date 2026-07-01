@@ -62,6 +62,12 @@
 	Move mismatched (non-hidden) data between two drives to /opt/diff:
 	     declutter -m copy /mnt/sdb1 /mnt/sdc1 /opt/diff
 
+	Same as previous line but removing part of the directory structure:
+	     declutter -R 'remove/me' -m copy /mnt/sdb1 /mnt/sdc1 /opt/diff
+
+	Same as previous line but adding to the directory structure:
+	     declutter -P 'add/me' -m copy /mnt/sdb1 /mnt/sdc1 /opt/diff
+
 
 
 

@@ -60,6 +60,12 @@
 - Updated the documentation to include additional examples
 
 2026/06/30
-- Completed adding -P and -R tests to all test scripts
+- Coontinued adding -P and -R tests to all test scripts
 - Replaced the follow-up 'rm' call for a '--remove-files' tar option
+
+2026/06/30
+- Added more examples to the documentation
+- Updated the .info files
+- Completed adding -P and -R tests to all test scripts
+- Tested in XiniX and TinyCore
 
